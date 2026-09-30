@@ -2,6 +2,7 @@ package net.portswigger.mcp.config.components
 
 import net.portswigger.mcp.config.Design
 import net.portswigger.mcp.config.McpConfig
+import net.portswigger.mcp.config.ScopeEnforcementMode
 import net.portswigger.mcp.config.ToggleSwitch
 import java.awt.FlowLayout
 import java.awt.event.ItemEvent
@@ -18,6 +19,7 @@ class ServerConfigurationPanel(
     private lateinit var alwaysAllowHttpHistoryCheckBox: JCheckBox
     private lateinit var alwaysAllowWebSocketHistoryCheckBox: JCheckBox
     private lateinit var alwaysAllowOrganizerCheckBox: JCheckBox
+    private lateinit var alwaysAllowSiteMapCheckBox: JCheckBox
 
     init {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -62,6 +64,17 @@ class ServerConfigurationPanel(
         add(httpRequestApprovalCheckBox)
         add(createVerticalStrut(Design.Spacing.MD))
 
+        add(createScopeEnforcementPanel())
+        add(createVerticalStrut(Design.Spacing.MD))
+
+        val agentActionLogCheckBox = createCheckBoxWithSubtitle(
+            "Log agent actions",
+            "Writes every MCP request, scan and change to ~/.burp-mcp/logs (JSON Lines)",
+            config.agentActionLogEnabled
+        ) { config.agentActionLogEnabled = it }
+        add(agentActionLogCheckBox)
+        add(createVerticalStrut(Design.Spacing.MD))
+
         val dataAccessApprovalCheckBox = createDataAccessApprovalCheckBox()
         add(dataAccessApprovalCheckBox)
         add(createVerticalStrut(Design.Spacing.SM))
@@ -86,6 +99,14 @@ class ServerConfigurationPanel(
             config.requireDataAccessApproval
         ) { config.alwaysAllowOrganizer = it }
         add(alwaysAllowOrganizerCheckBox)
+        add(createVerticalStrut(Design.Spacing.SM))
+
+        alwaysAllowSiteMapCheckBox = createIndentedCheckBox(
+            "Always allow site map access",
+            config.alwaysAllowSiteMap,
+            config.requireDataAccessApproval
+        ) { config.alwaysAllowSiteMap = it }
+        add(alwaysAllowSiteMapCheckBox)
         add(createVerticalStrut(Design.Spacing.MD))
 
         val filterConfigCredentialsCheckBox = createCheckBoxWithSubtitle(
@@ -112,6 +133,49 @@ class ServerConfigurationPanel(
         return enabledPanel
     }
 
+    private fun createScopeEnforcementPanel(): JPanel {
+        val comboBox = JComboBox(ScopeEnforcementMode.entries.toTypedArray()).apply {
+            selectedItem = config.scopeEnforcementMode
+            font = Design.Typography.bodyMedium
+            maximumSize = preferredSize
+            addItemListener { event ->
+                if (event.stateChange == ItemEvent.SELECTED) {
+                    config.scopeEnforcementMode = event.item as ScopeEnforcementMode
+                }
+            }
+        }
+
+        val row = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            alignmentX = LEFT_ALIGNMENT
+            add(JLabel("Target scope enforcement:").apply {
+                font = Design.Typography.bodyLarge
+                foreground = Design.Colors.onSurface
+            })
+            add(createHorizontalStrut(Design.Spacing.SM))
+            add(comboBox)
+        }
+
+        val subtitle = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            isOpaque = false
+            alignmentX = LEFT_ALIGNMENT
+            add(createHorizontalStrut(20))
+            add(JLabel("Applies to every request, crawl and audit started through MCP, before host approval").apply {
+                font = Design.Typography.labelMedium
+                foreground = Design.Colors.onSurfaceVariant
+            })
+        }
+
+        return JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            alignmentX = LEFT_ALIGNMENT
+            isOpaque = false
+            add(row)
+            add(createVerticalStrut(Design.Spacing.SM / 2))
+            add(subtitle)
+        }
+    }
+
     private fun createDataAccessApprovalCheckBox(): JCheckBox {
         return createStandardCheckBox(
             "Require approval for project data access", config.requireDataAccessApproval
@@ -121,13 +185,16 @@ class ServerConfigurationPanel(
                 config.alwaysAllowHttpHistory = false
                 config.alwaysAllowWebSocketHistory = false
                 config.alwaysAllowOrganizer = false
+                config.alwaysAllowSiteMap = false
                 alwaysAllowHttpHistoryCheckBox.isSelected = false
                 alwaysAllowWebSocketHistoryCheckBox.isSelected = false
                 alwaysAllowOrganizerCheckBox.isSelected = false
+                alwaysAllowSiteMapCheckBox.isSelected = false
             }
             alwaysAllowHttpHistoryCheckBox.isEnabled = enabled
             alwaysAllowWebSocketHistoryCheckBox.isEnabled = enabled
             alwaysAllowOrganizerCheckBox.isEnabled = enabled
+            alwaysAllowSiteMapCheckBox.isEnabled = enabled
         }
     }
 
@@ -136,6 +203,7 @@ class ServerConfigurationPanel(
             alwaysAllowHttpHistoryCheckBox.isSelected = config.alwaysAllowHttpHistory
             alwaysAllowWebSocketHistoryCheckBox.isSelected = config.alwaysAllowWebSocketHistory
             alwaysAllowOrganizerCheckBox.isSelected = config.alwaysAllowOrganizer
+            alwaysAllowSiteMapCheckBox.isSelected = config.alwaysAllowSiteMap
         }
     }
 

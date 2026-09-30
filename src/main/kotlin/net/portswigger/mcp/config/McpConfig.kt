@@ -48,7 +48,26 @@ class McpConfig(storage: PersistedObject, private val logging: Logging) {
             }
         }
 
+    private var _alwaysAllowSiteMap by storage.boolean(false)
+    var alwaysAllowSiteMap: Boolean
+        get() = _alwaysAllowSiteMap
+        set(value) {
+            if (_alwaysAllowSiteMap != value) {
+                _alwaysAllowSiteMap = value
+                notifyDataAccessChanged()
+            }
+        }
+
     var filterConfigCredentials by storage.boolean(true)
+
+    private var _scopeEnforcementMode by storage.string(ScopeEnforcementMode.DEFAULT.name)
+    var scopeEnforcementMode: ScopeEnforcementMode
+        get() = ScopeEnforcementMode.fromStored(_scopeEnforcementMode)
+        set(value) {
+            _scopeEnforcementMode = value.name
+        }
+
+    var agentActionLogEnabled by storage.boolean(true)
 
     private var _autoApproveTargets by storage.stringList("")
     private val targetsChangeListeners = CopyOnWriteArrayList<ListenerRegistration>()

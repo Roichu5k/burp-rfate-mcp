@@ -18,7 +18,6 @@ import net.portswigger.mcp.schema.encodeHistoryItem
 import net.portswigger.mcp.schema.toSerializableForm
 import net.portswigger.mcp.security.DataAccessSecurity
 import net.portswigger.mcp.security.DataAccessType
-import net.portswigger.mcp.security.HttpRequestSecurity
 import net.portswigger.mcp.security.filterConfigCredentials
 import java.awt.KeyboardFocusManager
 import java.util.regex.Pattern
@@ -111,19 +110,14 @@ private fun normalizePrelude(prelude: String): String = prelude
 fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
 
     mcpTool<SendHttp1Request>("Issues an HTTP/1.1 request and returns the response.") {
-        val allowed = runBlocking {
-            HttpRequestSecurity.checkHttpRequestPermission(targetHostname, targetPort, config, content, api)
-        }
-        if (!allowed) {
-            api.logging().logToOutput("MCP HTTP request denied: $targetHostname:$targetPort")
-            return@mcpTool "Send HTTP request denied by Burp Suite"
-        }
-
-        api.logging().logToOutput("MCP HTTP/1.1 request: $targetHostname:$targetPort")
-
         val fixedContent = normalizeHttpContent(content)
-
         val request = HttpRequest.httpRequest(toMontoyaService(), fixedContent)
+
+        val decision = authorizeTraffic(api, config, "send_http1_request", targetHostname, targetPort, request, content)
+        if (!decision.allowed) {
+            return@mcpTool "Send HTTP request denied by Burp Suite. ${decision.reason}"
+        }
+
         val response = api.http().sendRequest(request)
 
         response?.toString() ?: "<no response>"
@@ -144,19 +138,14 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
             }
         }
 
-        val allowed = runBlocking {
-            HttpRequestSecurity.checkHttpRequestPermission(targetHostname, targetPort, config, http2RequestDisplay, api)
-        }
-        if (!allowed) {
-            api.logging().logToOutput("MCP HTTP request denied: $targetHostname:$targetPort")
-            return@mcpTool "Send HTTP request denied by Burp Suite"
-        }
-
-        api.logging().logToOutput("MCP HTTP/2 request: $targetHostname:$targetPort")
-
         val headerList = buildHttp2HeaderList(pseudoHeaders, headers)
-
         val request = HttpRequest.http2Request(toMontoyaService(), headerList, requestBody)
+
+        val decision = authorizeTraffic(api, config, "send_http2_request", targetHostname, targetPort, request, http2RequestDisplay)
+        if (!decision.allowed) {
+            return@mcpTool "Send HTTP request denied by Burp Suite. ${decision.reason}"
+        }
+
         val response = api.http().sendRequest(request, HttpMode.HTTP_2)
 
         response?.toString() ?: "<no response>"
@@ -227,7 +216,7 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
     val toolingDisabledMessage =
         "User has disabled configuration editing. They can enable it in the MCP tab in Burp by selecting 'Enable tools that can edit your config'"
 
-    mcpTool<SetProjectOptions>("Sets project-level configuration in JSON format. This will be merged with existing configuration. Make sure to export before doing this, so you know what the schema is. Make sure the JSON has a top level 'user_options' object!") {
+    mcpTool<SetProjectOptions>("Sets project-level configuration in JSON format. This will be merged with existing configuration. Make sure to export before doing this, so you know what the schema is. Make sure the JSON has a top level 'project_options' object!") {
         if (config.configEditingTooling) {
             api.logging().logToOutput("Setting project-level configuration: $json")
             api.burpSuite().importProjectOptionsFromJson(json)
@@ -239,7 +228,7 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
     }
 
 
-    mcpTool<SetUserOptions>("Sets user-level configuration in JSON format. This will be merged with existing configuration. Make sure to export before doing this, so you know what the schema is. Make sure the JSON has a top level 'project_options' object!") {
+    mcpTool<SetUserOptions>("Sets user-level configuration in JSON format. This will be merged with existing configuration. Make sure to export before doing this, so you know what the schema is. Make sure the JSON has a top level 'user_options' object!") {
         if (config.configEditingTooling) {
             api.logging().logToOutput("Setting user-level configuration: $json")
             api.burpSuite().importUserOptionsFromJson(json)
