@@ -23,7 +23,7 @@ import java.awt.KeyboardFocusManager
 import java.util.regex.Pattern
 import javax.swing.JTextArea
 
-private suspend fun checkDataAccessOrDeny(
+internal suspend fun checkDataAccessOrDeny(
     accessType: DataAccessType, config: McpConfig, api: MontoyaApi, logMessage: String
 ): Boolean {
     val allowed = DataAccessSecurity.checkDataAccessPermission(accessType, config)
@@ -390,6 +390,8 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
 
         "Editor text has been set"
     }
+
+    registerReconTools(api, config)
 }
 
 fun getActiveEditor(api: MontoyaApi): JTextArea? {

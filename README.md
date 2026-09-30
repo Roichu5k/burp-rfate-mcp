@@ -1,3 +1,60 @@
+# burp-rfate-mcp
+
+Fork of [PortSwigger/mcp-server](https://github.com/PortSwigger/mcp-server) (the official Burp Suite MCP
+extension) with extra recon tooling and scope-based guardrails, for authorized web/API assessments.
+
+Upstream `main` is tracked as the `upstream` remote so official updates can be merged in.
+
+## What this fork adds on top of upstream
+
+### Site map / recon tools
+So an agent can map a target's attack surface without paging through the entire proxy HTTP history:
+
+- **`get_site_map`** — lists endpoints from Burp's target site map. Compact mode (default) returns one
+  deduplicated line per endpoint (`METHOD path -> statusCodes | params: type:name,... | mimeType`);
+  `detail=true` returns full request/response per entry. Filters: `urlPrefix`, `inScopeOnly` (default true),
+  plus `count`/`offset` paging. Gated behind the site-map data-access permission.
+- **`is_in_scope`** — whether a URL is in the current Target scope.
+- **`get_scope`** — the current include/exclude scope rules (read-only).
+- **`set_scope_rule`** — add/remove a URL prefix from scope. Gated on *Enable tools that can edit your
+  config*, so an agent can't widen its own scope without your consent.
+
+### Scope enforcement guardrail
+New **Target scope enforcement** selector in the MCP tab, applied to every request/scan started through MCP,
+*before* the per-host approval dialog and independently of it:
+
+- `Off (host approval only)` — original upstream behaviour.
+- `Block out-of-scope targets` (**default**) — out-of-scope targets are always denied; in-scope still prompts.
+- `Block out-of-scope, auto-approve in-scope` — out-of-scope denied, in-scope sent without prompting.
+
+Unknown/corrupted stored values fall back to `Block out-of-scope`, never to `Off`.
+
+### Agent action log
+Optional (on by default): every MCP request, denial and scope change is appended to
+`~/.burp-mcp/logs/agent-actions-YYYY-MM-DD.jsonl` — one JSON object per line with timestamp, project, tool,
+target, decision and reason. Request **line**, byte size and SHA-256 only; never headers or bodies, so it
+proves what was sent without duplicating client credentials. Toggle in the MCP tab.
+
+### Upstream bug fix
+`set_project_options` / `set_user_options` descriptions had their required top-level object names swapped
+(`user_options` vs `project_options`); corrected here.
+
+## Verifying the guardrail (manual)
+
+1. Set *Target scope enforcement* = *Block out-of-scope targets* and add one host to Target > Scope.
+2. Ask the MCP client for `send_http1_request` to an in-scope host → approval dialog appears.
+3. Ask for one to an out-of-scope host → denied with `outside the Burp Suite target scope`, no dialog,
+   even with *Require approval for HTTP requests* unchecked.
+4. Check `~/.burp-mcp/logs/agent-actions-<date>.jsonl`: both attempts logged, one `allowed:true`, one
+   `false`, neither carrying headers or bodies.
+
+Load the built `build/libs/*.jar` in Burp (Extensions → Add). Unload the official Burp MCP extension first —
+both use port 9876 and the "MCP" tab.
+
+---
+
+Upstream documentation follows.
+
 # Burp Suite MCP Server Extension
 
 ## Overview
