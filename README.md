@@ -12,8 +12,9 @@ So an agent can map a target's attack surface without paging through the entire 
 
 - **`get_site_map`** — lists endpoints from Burp's target site map. Compact mode (default) returns one
   deduplicated line per endpoint (`METHOD path -> statusCodes | params: type:name,... | mimeType`);
-  `detail=true` returns full request/response per entry. Filters: `urlPrefix`, `inScopeOnly` (default true),
-  plus `count`/`offset` paging. Gated behind the site-map data-access permission.
+  `detail=true` returns full request/response per entry. Filters: `urlPrefix`, `inScopeOnly` (default **false** —
+  returns all entries; set true to keep only in-scope, but note an empty Target scope matches nothing), plus
+  `count`/`offset` paging. Gated behind the site-map data-access permission.
 - **`is_in_scope`** — whether a URL is in the current Target scope.
 - **`get_scope`** — the current include/exclude scope rules (read-only).
 - **`set_scope_rule`** — add/remove a URL prefix from scope. Gated on *Enable tools that can edit your

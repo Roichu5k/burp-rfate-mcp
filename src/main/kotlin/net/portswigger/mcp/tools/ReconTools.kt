@@ -24,11 +24,12 @@ import net.portswigger.mcp.security.DataAccessType
 internal fun Server.registerReconTools(api: MontoyaApi, config: McpConfig) {
 
     mcpPaginatedTool<GetSiteMap>(
-        "Lists endpoints from Burp's target site map, optionally filtered by URL prefix and to in-scope only " +
-        "(in-scope only is the default). Compact mode (default) returns one deduplicated line per endpoint: " +
-        "'METHOD path -> statusCodes | params: type:name,... | mimeType', which maps a target's attack surface " +
-        "without dumping full HTTP history. Set detail=true to instead return the full request/response for each " +
-        "matching entry (paginated and truncated). Use urlPrefix to scope to a host or path, e.g. https://example.com/api/."
+        "Lists endpoints from Burp's target site map, optionally filtered by URL prefix. Compact mode (default) " +
+        "returns one deduplicated line per endpoint: 'METHOD path -> statusCodes | params: type:name,... | mimeType', " +
+        "which maps a target's attack surface without dumping full HTTP history. Set detail=true to instead return " +
+        "the full request/response for each matching entry (paginated and truncated). Use urlPrefix to narrow to a " +
+        "host or path, e.g. https://example.com/api/. By default ALL site map entries are returned; set " +
+        "inScopeOnly=true to keep only entries within Burp's target scope (note: an empty scope matches nothing)."
     ) {
         val allowed = runBlocking {
             checkDataAccessOrDeny(DataAccessType.SITE_MAP, config, api, "site map")
@@ -44,15 +45,31 @@ internal fun Server.registerReconTools(api: MontoyaApi, config: McpConfig) {
             api.siteMap().requestResponses(SiteMapFilter.prefixFilter(prefix))
         }
 
-        val scoped = if (inScopeOnly != false) {
+        // Scope filtering is opt-in: an empty Target scope makes isInScope() false for everything, which
+        // would otherwise silently drop every entry. Default is to return all entries.
+        val requestedInScope = inScopeOnly == true
+        val scoped = if (requestedInScope) {
             entries.filter { safeCall { it.request()?.isInScope() } == true }
         } else {
             entries
         }
 
+        if (entries.isEmpty()) {
+            return@mcpPaginatedTool sequenceOf(
+                "Site map is empty for this filter" + (prefix?.let { " (prefix: $it)" } ?: "") +
+                ". Browse or crawl the target first so it appears in Target > Site map."
+            )
+        }
+
+        if (requestedInScope && scoped.isEmpty()) {
+            return@mcpPaginatedTool sequenceOf(
+                "None of the ${entries.size} matching site map entrie(s) are in scope. Your Target scope may be " +
+                "empty or may exclude these hosts. Re-run with inScopeOnly=false, or add the host in Target > Scope."
+            )
+        }
+
         if (detail == true) {
-            if (scoped.isEmpty()) sequenceOf("No matching site map entries")
-            else scoped.asSequence().map { encodeHistoryItem(it.toSerializableForm()) }
+            scoped.asSequence().map { encodeHistoryItem(it.toSerializableForm()) }
         } else {
             summarizeEndpoints(scoped)
         }
